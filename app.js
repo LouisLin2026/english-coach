@@ -43,6 +43,50 @@ const Storage = {
   }
 };
 
+// ── Voice Picker ───────────────────────────────────────────
+// 自動挑選各平台「甜美女聲」。不同手機/系統可用的聲音不同，
+// 依偏好清單比對，找不到就退而求其次用該語系任一女聲。
+const Voices = {
+  en: null,
+  zh: null,
+  loaded: false,
+  // 英文女聲偏好（iOS / Android / Windows / Mac 常見的甜美女聲）
+  EN_PREF: ['Samantha', 'Ava', 'Allison', 'Susan', 'Google US English',
+            'Microsoft Aria', 'Microsoft Zira', 'Microsoft Jenny',
+            'Karen', 'Tessa', 'Victoria', 'Female'],
+  // 中文（台灣）女聲偏好
+  ZH_PREF: ['Mei-Jia', 'Meijia', 'Google 國語（臺灣）', 'Microsoft HsiaoChen',
+            'Microsoft Yating', 'Microsoft HanHan', 'Ya-Ling', 'Tingting',
+            'Sinji', 'Female', '女'],
+
+  refresh() {
+    const all = speechSynthesis.getVoices();
+    if (!all.length) return;            // 有些瀏覽器首次回傳空陣列
+    const pick = (prefs, prefix) => {
+      const inLang = all.filter(v => (v.lang || '').toLowerCase().startsWith(prefix));
+      for (const name of prefs) {
+        const hit = inLang.find(v =>
+          (v.name || '').toLowerCase().includes(name.toLowerCase()));
+        if (hit) return hit;
+      }
+      return inLang[0] || null;          // 退而求其次：該語系任一聲音
+    };
+    this.en = pick(this.EN_PREF, 'en');
+    this.zh = pick(this.ZH_PREF, 'zh');
+    this.loaded = true;
+  },
+
+  forLang(lang) {
+    if (!this.loaded) this.refresh();
+    return (lang || '').startsWith('zh') ? this.zh : this.en;
+  }
+};
+if ('speechSynthesis' in window) {
+  // 語音清單常是非同步載入，監聽事件才抓得到
+  speechSynthesis.onvoiceschanged = () => Voices.refresh();
+  Voices.refresh();
+}
+
 // ── TTS Engine ─────────────────────────────────────────────
 const TTS = {
   queue: [],
@@ -55,8 +99,11 @@ const TTS = {
       if (this.stopped) { resolve(); return; }
       const u = new SpeechSynthesisUtterance(text);
       u.lang  = lang;
+      const v = Voices.forLang(lang);
+      if (v) u.voice = v;
       u.rate  = rate * State.speed;
-      u.pitch = lang.startsWith('zh') ? 1.1 : 1.0;
+      // 音調拉高一點，營造甜美可愛的聲線（中文再甜一點）
+      u.pitch = lang.startsWith('zh') ? 1.35 : 1.25;
       u.volume = 1.0;
       u.onend     = resolve;
       u.onerror   = resolve;   // don't stall on error
@@ -101,12 +148,12 @@ const TTS = {
       { label: '英文加強', fn: () => en(lesson.english) },
     ];
 
-    // Vocabulary
+    // Vocabulary — same rhythm as the sentence: EN → ZH → EN → EN (3x English)
     lesson.vocabulary.forEach(v => {
-      phases.push({
-        label: `單字 ${v.word}`,
-        fn: () => en(`${v.word} means ${v.meaning}`)
-      });
+      phases.push({ label: `單字 ${v.word}`,        fn: () => en(v.word) });
+      phases.push({ label: `單字翻譯 ${v.meaning}`, fn: () => zh(v.meaning) });
+      phases.push({ label: `單字重複 ${v.word}`,    fn: () => en(v.word) });
+      phases.push({ label: `單字加強 ${v.word}`,    fn: () => en(v.word) });
     });
 
     // Scenario
@@ -177,7 +224,7 @@ const App = {
 
     // Category sections
     const sections = [
-      { title: 'Business English',                 range: [1, 30]  },
+      { title: '每日綜合會話 Daily Mix',         range: [1, 30]  },
       { title: 'Food Factory English',             range: [31, 60] },
       { title: 'International Equipment English',  range: [61, 90] },
     ];
@@ -252,6 +299,7 @@ const App = {
         <div class="lesson-card ${done ? 'done' : ''}" onclick="App.goLesson(${i})">
           <div class="lesson-num-badge">${done ? '✓' : i + 1}</div>
           <div class="lesson-info">
+            ${l.type ? `<span class="lesson-type type-${typeClass(l.type)}">${l.type}</span>` : ''}
             <div class="lesson-english">${l.english}</div>
             <div class="lesson-chinese">${l.chinese}</div>
           </div>
@@ -292,7 +340,7 @@ const App = {
     document.getElementById('app').innerHTML = `
       <div class="day-view-header">
         <button class="back-btn" onclick="App.goDay(${course.day})">‹ Day ${course.day}</button>
-        <div class="day-view-title">Lesson ${lessonIdx + 1}</div>
+        <div class="day-view-title">Lesson ${lessonIdx + 1}${lesson.type ? ` <span class="lesson-type type-${typeClass(lesson.type)}">${lesson.type}</span>` : ''}</div>
       </div>
       <div class="lesson-player">
         <div class="lesson-player-header">
@@ -688,6 +736,11 @@ function calcStreak() {
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
+}
+
+// 類型 → 色彩 class
+function typeClass(type) {
+  return ({ '商務': 'biz', '俚語': 'slang', '電影': 'movie', '時事': 'news' })[type] || 'biz';
 }
 
 function loadingHTML() {

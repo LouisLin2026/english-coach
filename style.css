@@ -78,7 +78,7 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 16px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -263,7 +263,7 @@ a { text-decoration: none; color: inherit; }
 
 /* ── Day View ── */
 .day-view-header {
-  padding: 20px 20px 16px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 16px;
   border-bottom: 1px solid var(--border);
 }
 .back-btn {
@@ -342,6 +342,21 @@ a { text-decoration: none; color: inherit; }
   color: var(--green);
 }
 .lesson-info { flex: 1; min-width: 0; }
+.lesson-type {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+.lesson-type.type-biz   { color: var(--blue);   background: rgba(96,165,250,0.14); }
+.lesson-type.type-slang { color: var(--green);  background: rgba(34,211,165,0.14); }
+.lesson-type.type-movie { color: var(--orange); background: rgba(251,146,60,0.14); }
+.lesson-type.type-news  { color: var(--red);    background: rgba(248,113,113,0.14); }
 .lesson-english {
   font-size: 14px;
   font-weight: 600;
