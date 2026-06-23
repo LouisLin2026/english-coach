@@ -1,0 +1,35 @@
+{
+  "name": "Louis Food English Coach",
+  "short_name": "LFEC",
+  "description": "食品產業主管專屬英文學習系統 — 通勤時自動播放，像 Podcast 一樣學英文",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0C10",
+  "theme_color": "#22D3A5",
+  "lang": "zh-TW",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Car Mode",
+      "short_name": "Car Mode",
+      "description": "直接進入車用播放模式",
+      "url": "./index.html?mode=car"
+    }
+  ]
+}

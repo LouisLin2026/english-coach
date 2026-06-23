@@ -1,0 +1,198 @@
+[
+  {
+    "day": 1,
+    "title": "First Impressions",
+    "category": "Business English",
+    "lessons": [
+      {
+        "english": "Good morning, I'm Louis Lin, Senior Manager of R&D and Engineering.",
+        "chinese": "早安，我是林祿偉，研發與工程部門的資深經理。",
+        "vocabulary": [
+          { "word": "Senior Manager", "meaning": "資深經理" },
+          { "word": "R&D", "meaning": "研究與開發" },
+          { "word": "Engineering", "meaning": "工程部門" }
+        ],
+        "scenario": "第一次與外國訪客或新同事見面時的自我介紹"
+      },
+      {
+        "english": "Welcome to BFY Corporation. We specialize in food manufacturing.",
+        "chinese": "歡迎來到貝特福優公司。我們專精於食品製造。",
+        "vocabulary": [
+          { "word": "Corporation", "meaning": "股份有限公司" },
+          { "word": "specialize in", "meaning": "專精於" },
+          { "word": "food manufacturing", "meaning": "食品製造" }
+        ],
+        "scenario": "帶外賓參觀工廠或接待客戶時的開場白"
+      },
+      {
+        "english": "Our facility is located in Yilan, Taiwan, and we produce snack foods.",
+        "chinese": "我們的廠房位於台灣宜蘭，生產休閒零食。",
+        "vocabulary": [
+          { "word": "facility", "meaning": "廠房，設施" },
+          { "word": "located in", "meaning": "位於" },
+          { "word": "snack foods", "meaning": "休閒零食" }
+        ],
+        "scenario": "向外賓介紹公司基本資訊"
+      },
+      {
+        "english": "Nice to meet you. Please feel free to ask any questions during the tour.",
+        "chinese": "很高興認識您。參觀過程中請隨時提問。",
+        "vocabulary": [
+          { "word": "feel free to", "meaning": "請隨時，不用客氣" },
+          { "word": "during the tour", "meaning": "在參觀過程中" }
+        ],
+        "scenario": "工廠參觀開始前的禮貌性邀請"
+      },
+      {
+        "english": "Let me introduce you to our production team leader, Mr. Chen.",
+        "chinese": "讓我為您介紹我們的生產線長陳先生。",
+        "vocabulary": [
+          { "word": "introduce", "meaning": "介紹" },
+          { "word": "production team leader", "meaning": "生產線長" }
+        ],
+        "scenario": "多方會面時的正式介紹"
+      },
+      {
+        "english": "Here is my business card. I look forward to working with you.",
+        "chinese": "這是我的名片。我期待與您合作。",
+        "vocabulary": [
+          { "word": "business card", "meaning": "名片" },
+          { "word": "look forward to", "meaning": "期待，盼望" }
+        ],
+        "scenario": "商務場合遞交名片時的用語"
+      }
+    ]
+  },
+  {
+    "day": 2,
+    "title": "Production Floor Talk",
+    "category": "Business English",
+    "lessons": [
+      {
+        "english": "Let's start today's morning briefing. What is the production output for Line 1?",
+        "chinese": "我們開始今天的早會。第一線的生產量是多少？",
+        "vocabulary": [
+          { "word": "morning briefing", "meaning": "早會，晨報" },
+          { "word": "production output", "meaning": "生產量，產出" },
+          { "word": "Line 1", "meaning": "第一生產線" }
+        ],
+        "scenario": "每天早上召開生產例會時的開場"
+      },
+      {
+        "english": "We achieved 95% of our daily target. The remaining 5% was delayed due to a machine breakdown.",
+        "chinese": "我們達成了每日目標的95%。剩餘5%因機器故障而延誤。",
+        "vocabulary": [
+          { "word": "achieved", "meaning": "達成了" },
+          { "word": "daily target", "meaning": "每日目標" },
+          { "word": "machine breakdown", "meaning": "機器故障" }
+        ],
+        "scenario": "回報生產績效時的標準用語"
+      },
+      {
+        "english": "Please arrange for immediate maintenance on the extruder in Zone A.",
+        "chinese": "請立即安排成型區擠壓機的維修。",
+        "vocabulary": [
+          { "word": "arrange for", "meaning": "安排" },
+          { "word": "immediate maintenance", "meaning": "即時維修" },
+          { "word": "extruder", "meaning": "擠壓機，成型機" }
+        ],
+        "scenario": "指派維修任務時的指令"
+      },
+      {
+        "english": "The shift handover report must be completed before you leave.",
+        "chinese": "交班報告必須在你離開前完成。",
+        "vocabulary": [
+          { "word": "shift handover", "meaning": "交班" },
+          { "word": "report", "meaning": "報告" },
+          { "word": "completed", "meaning": "完成的" }
+        ],
+        "scenario": "要求工班交接完成交班報告"
+      },
+      {
+        "english": "We need to increase throughput by 10% this week to meet the customer order.",
+        "chinese": "本週我們需要提升10%的產能以完成客戶訂單。",
+        "vocabulary": [
+          { "word": "increase throughput", "meaning": "提升產能" },
+          { "word": "customer order", "meaning": "客戶訂單" }
+        ],
+        "scenario": "生產會議中討論目標調整"
+      },
+      {
+        "english": "Are there any safety concerns we need to address before starting the line?",
+        "chinese": "在開線前，有沒有需要處理的安全問題？",
+        "vocabulary": [
+          { "word": "safety concerns", "meaning": "安全顧慮" },
+          { "word": "address", "meaning": "處理，解決" },
+          { "word": "starting the line", "meaning": "開始生產線" }
+        ],
+        "scenario": "開工前的安全確認程序"
+      }
+    ]
+  },
+  {
+    "day": 3,
+    "title": "Quality First",
+    "category": "Business English",
+    "lessons": [
+      {
+        "english": "Our quality standard requires a defect rate of less than 0.5 percent.",
+        "chinese": "我們的品質標準要求不良率低於0.5%。",
+        "vocabulary": [
+          { "word": "quality standard", "meaning": "品質標準" },
+          { "word": "defect rate", "meaning": "不良率" },
+          { "word": "less than", "meaning": "低於，少於" }
+        ],
+        "scenario": "向客戶或稽核員說明品質規格"
+      },
+      {
+        "english": "This batch has been placed on hold pending a full inspection.",
+        "chinese": "這批貨已暫停出貨，等待全面檢驗。",
+        "vocabulary": [
+          { "word": "placed on hold", "meaning": "暫停，扣押" },
+          { "word": "pending", "meaning": "等待中，尚未完成" },
+          { "word": "full inspection", "meaning": "全面檢驗" }
+        ],
+        "scenario": "發現品質問題時的緊急處置措施"
+      },
+      {
+        "english": "We need to implement a corrective action plan within 24 hours.",
+        "chinese": "我們需要在24小時內實施矯正行動計畫。",
+        "vocabulary": [
+          { "word": "implement", "meaning": "執行，實施" },
+          { "word": "corrective action plan", "meaning": "矯正行動計畫" },
+          { "word": "within 24 hours", "meaning": "在24小時內" }
+        ],
+        "scenario": "客訴或稽核後的改善回覆"
+      },
+      {
+        "english": "The sensory evaluation results show the product meets all specifications.",
+        "chinese": "品評結果顯示，產品符合所有規格。",
+        "vocabulary": [
+          { "word": "sensory evaluation", "meaning": "感官品評" },
+          { "word": "meets specifications", "meaning": "符合規格" }
+        ],
+        "scenario": "品評會議結論報告"
+      },
+      {
+        "english": "Please ensure all records are documented for the upcoming audit.",
+        "chinese": "請確保所有記錄均已建檔，以備即將到來的稽核。",
+        "vocabulary": [
+          { "word": "documented", "meaning": "已建檔的，已記錄的" },
+          { "word": "upcoming audit", "meaning": "即將到來的稽核" },
+          { "word": "ensure", "meaning": "確保" }
+        ],
+        "scenario": "稽核前準備工作的叮嚀"
+      },
+      {
+        "english": "I apologize for the inconvenience. We take full responsibility and will prevent recurrence.",
+        "chinese": "對造成的不便我深感抱歉。我們承擔全部責任，並將防止再發生。",
+        "vocabulary": [
+          { "word": "apologize", "meaning": "道歉" },
+          { "word": "take full responsibility", "meaning": "承擔全部責任" },
+          { "word": "prevent recurrence", "meaning": "防止再發生" }
+        ],
+        "scenario": "處理客戶投訴時的正式回應"
+      }
+    ]
+  }
+]
