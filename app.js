@@ -26,6 +26,7 @@ const State = {
   chinesePitch: 1.20,     // 0.8 ~ 1.5
   englishVolume: 1.0,     // 0.5 ~ 1.0
   chineseVolume: 1.0,     // 0.5 ~ 1.0
+  audioEngine: 'tts',     // 預留：'tts' | 'mp3'（未來 Audio MP3 Engine）
   carMode: {
     playing: false,
     paused: false,
@@ -188,6 +189,101 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   speechSynthesis.onvoiceschanged = () => Voices.refresh();
   Voices.refresh();
 }
+
+// ── CarPlay Compatibility Layer (相容性修補層) ─────────────
+// 無線 CarPlay 下 speechSynthesis 常無聲，需在使用者手勢中先解鎖音訊工作階段。
+const AudioUnlock = {
+  ctx: null,
+  silent: null,
+  unlocked: false,
+  _wavUrl: null,
+
+  // 產生一段極短的靜音 WAV（給 new Audio() 用，喚醒 iOS 音訊工作階段）
+  makeSilentWav() {
+    const sampleRate = 8000, seconds = 0.05;
+    const n = Math.floor(sampleRate * seconds);
+    const buf = new ArrayBuffer(44 + n);
+    const dv = new DataView(buf);
+    const w = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate, true);
+    dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); w(36, 'data'); dv.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) dv.setUint8(44 + i, 128);   // 8-bit PCM 靜音
+    let bin = ''; const bytes = new Uint8Array(buf);
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  },
+
+  init() {
+    if (!this._wavUrl) { try { this._wavUrl = this.makeSilentWav(); } catch (e) { this._wavUrl = ''; } }
+    if (!this.silent) {
+      try {
+        this.silent = new Audio(this._wavUrl);
+        this.silent.volume = 0;
+        this.silent.setAttribute('playsinline', '');
+      } catch (e) {}
+    }
+  },
+
+  // 必須在使用者手勢（按鈕點擊）中呼叫
+  unlock() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        if (!this.ctx) this.ctx = new AC();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+      }
+    } catch (e) {}
+    try {
+      this.init();
+      if (this.silent) {
+        this.silent.currentTime = 0;
+        const p = this.silent.play();
+        if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) {}
+    try { if ('speechSynthesis' in window) speechSynthesis.resume(); } catch (e) {}
+    this.unlocked = true;
+  },
+
+  state() { return this.ctx ? this.ctx.state : 'none'; }
+};
+
+const CarPlayCompat = {
+  available: (typeof window !== 'undefined' && 'speechSynthesis' in window),
+  lastResult: null,   // null=未檢測 | 'ok' | 'fail'
+
+  voicesCount() { try { return speechSynthesis.getVoices().length; } catch (e) { return 0; } },
+
+  // 自我檢測：播一句極短語音，看 onstart 是否在時限內觸發。
+  // 用獨立的 utterance，不經過 TTS.speak，避免影響播放核心。
+  diagnose(onDone) {
+    if (!this.available) { this.lastResult = 'fail'; onDone && onDone(); return; }
+    let started = false, done = false;
+    const finish = (r) => { if (done) return; done = true; this.lastResult = r; onDone && onDone(); };
+    try {
+      const u = new SpeechSynthesisUtterance('test');
+      u.volume = 0.02; u.rate = 2;
+      const v = Voices.forLang('en-US'); if (v) u.voice = v;
+      u.onstart = () => { started = true; finish('ok'); };
+      u.onend   = () => { if (started) finish('ok'); };
+      u.onerror = () => finish('fail');
+      speechSynthesis.speak(u);
+      setTimeout(() => { if (!started) { try { speechSynthesis.cancel(); } catch (e) {} finish('fail'); } }, 1800);
+    } catch (e) { finish('fail'); }
+  },
+
+  warn() { return this.lastResult === 'fail'; }
+};
+
+// 預留：未來 Audio MP3 Engine（尚未啟用，供日後繞過 SpeechSynthesis 用）
+const MP3Engine = {
+  enabled: false,
+  available: false,
+  // play(url) { return new Audio(url).play(); }  // TODO: 改用預錄 MP3 播放
+  play() { return Promise.resolve(); }
+};
 
 // ── TTS Engine ─────────────────────────────────────────────
 const TTS = {
@@ -518,6 +614,7 @@ const App = {
 
     if (TTS.active) { TTS.stop(); TTS.reset(); btn.classList.remove('speaking'); return; }
 
+    AudioUnlock.unlock();   // CarPlay 相容：手勢中解鎖音訊
     TTS.reset();
     btn.classList.add('speaking');
     TTS.playLesson(lesson, () => {}).then(() => {
@@ -544,6 +641,7 @@ const App = {
     }
     TTS.stop();
     TTS.reset();
+    AudioUnlock.unlock();   // CarPlay 相容：進入 Car Mode 的手勢中解鎖音訊
     State.carMode = { playing: false, paused: false, currentDayIdx: dayIdx, currentLessonIdx: 0, phase: '', stage: 'lessons', reviewIdx: 0, summaryIdx: 0, runId: 0 };
     State.view = 'car';
     this.renderCarMode();
@@ -728,6 +826,7 @@ const App = {
     const cm = State.carMode;
     if (!cm.playing) {
       // 開始 / 從目前位置續播（會重唸目前這一句，行車時更清楚）
+      AudioUnlock.unlock();   // CarPlay 相容：Play 手勢中解鎖音訊
       TTS.reset();
       this.carPlay();
     } else {
@@ -973,6 +1072,24 @@ const App = {
     const rngStyle = 'flex:1;accent-color:var(--green)';
     const valStyle = 'min-width:38px;text-align:right;color:var(--green);font-weight:700;font-size:13px';
 
+    // ── CarPlay Debug Panel 資料 ──
+    const ssAvail  = (typeof window !== 'undefined' && 'speechSynthesis' in window);
+    const vCount   = CarPlayCompat.voicesCount();
+    const acState  = AudioUnlock.state();
+    const curEn    = Voices.en ? Voices.en.name : '—';
+    const curZh    = Voices.zh ? Voices.zh.name : '—';
+    const diagLabel = CarPlayCompat.lastResult === 'ok'   ? '✅ 可播放'
+                    : CarPlayCompat.lastResult === 'fail' ? '⚠️ 無法播放'
+                    : '尚未檢測';
+    const dbgVal = 'color:var(--blue);font-weight:700;font-size:12px;text-align:right;word-break:break-all';
+    const warnHTML = CarPlayCompat.warn() ? `
+          <div class="settings-row">
+            <div class="settings-item" style="flex-direction:column;align-items:flex-start;gap:6px;background:rgba(248,113,113,0.10);border:1px solid var(--red);border-radius:10px;padding:12px">
+              <span style="color:var(--red);font-weight:800;font-size:13px">⚠️ CarPlay Compatibility Warning</span>
+              <span style="color:var(--muted);font-size:12px;line-height:1.6;font-weight:400">偵測到目前環境的 SpeechSynthesis 無法正常啟動（常見於無線 CarPlay）。建議：先按「解鎖音訊並自我檢測」、確認車機音量、或改用藍牙音訊。未來版本將支援 Audio MP3 Engine 以繞過此限制。</span>
+            </div>
+          </div>` : '';
+
     document.getElementById('app').innerHTML = `
       <div class="topbar">
         <button class="back-btn" onclick="App.renderHome()" style="display:flex;align-items:center;gap:6px;font-size:15px;color:var(--green);background:none">‹ 返回</button>
@@ -1104,6 +1221,57 @@ const App = {
           </div>
         </div>
         <div class="settings-group">
+          <div class="settings-group-label">CarPlay 相容性 / Debug</div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">speechSynthesis available</span>
+              <span style="${dbgVal}">${ssAvail ? 'yes' : 'no'}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">voices count</span>
+              <span style="${dbgVal}">${vCount}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">current voice (EN)</span>
+              <span style="${dbgVal}">${curEn}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">current voice (ZH)</span>
+              <span style="${dbgVal}">${curZh}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">audio context state</span>
+              <span style="${dbgVal}">${acState}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">play test 結果</span>
+              <span style="${dbgVal}">${diagLabel}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">無線 CarPlay 沒聲音時按這</span>
+              <button class="theme-chip" onclick="App.carplayDiagnose()">🔓 解鎖音訊並自我檢測</button>
+            </div>
+          </div>
+          ${warnHTML}
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label" style="font-size:11px;color:var(--muted);font-weight:400;line-height:1.6">提示：iOS 無線 CarPlay 需在按下播放的同一個手勢中解鎖音訊。本層已在 Car Mode / Lesson / 試聽 的播放按鈕自動解鎖。未來將預留 Audio MP3 Engine 作為備援。</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-group">
           <div class="settings-group-label">進度</div>
           <div class="settings-row">
             <div class="settings-item">
@@ -1201,11 +1369,20 @@ const App = {
   testVoice(kind) {
     TTS.stop();
     TTS.reset();
+    AudioUnlock.unlock();   // CarPlay 相容：試聽前解鎖音訊
     if (kind === 'zh') {
       TTS.speak('歡迎使用 Louis Food English Coach。', 'zh-TW');
     } else {
       TTS.speak('Good morning, welcome to Louis Food English Coach.', 'en-US');
     }
+  },
+
+  // CarPlay：解鎖音訊並自我檢測
+  carplayDiagnose() {
+    AudioUnlock.unlock();
+    CarPlayCompat.lastResult = null;
+    this.renderSettings();   // 顯示「檢測中」
+    CarPlayCompat.diagnose(() => this.renderSettings());
   },
 
   resetProgress() {
