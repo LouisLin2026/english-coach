@@ -18,6 +18,14 @@ const State = {
   categoryFilter: 'all',  // 'all' | '商務' | '俚語' | '電影' | '時事'（V1.1，播放時選擇，不持久化）
   favorites: [],          // 收藏句庫（V1.1）
   lastSession: null,      // 自動續播位置（V1.1）
+  // ── Voice Character System V2.1 ──
+  voiceStyle: 'sweet',    // 'normal' | 'sweet' | 'very_sweet'
+  englishVoiceURI: null,  // 使用者選定的英文語音（voiceURI），null = 依優先序自動挑
+  chineseVoiceURI: null,  // 使用者選定的中文語音
+  englishPitch: 1.15,     // 0.8 ~ 1.5
+  chinesePitch: 1.20,     // 0.8 ~ 1.5
+  englishVolume: 1.0,     // 0.5 ~ 1.0
+  chineseVolume: 1.0,     // 0.5 ~ 1.0
   carMode: {
     playing: false,
     paused: false,
@@ -41,6 +49,13 @@ const Storage = {
       theme:            State.theme,
       playMode:         State.playMode,
       pauseTime:        State.pauseTime,
+      voiceStyle:       State.voiceStyle,
+      englishVoiceURI:  State.englishVoiceURI,
+      chineseVoiceURI:  State.chineseVoiceURI,
+      englishPitch:     State.englishPitch,
+      chinesePitch:     State.chinesePitch,
+      englishVolume:    State.englishVolume,
+      chineseVolume:    State.chineseVolume,
     }));
   },
   load() {
@@ -52,6 +67,13 @@ const Storage = {
       State.theme            = d.theme            || 'auto';
       State.playMode         = d.playMode         || 'full';
       State.pauseTime        = (d.pauseTime != null) ? d.pauseTime : 1.0;
+      State.voiceStyle       = d.voiceStyle        || 'sweet';
+      State.englishVoiceURI  = d.englishVoiceURI   || null;
+      State.chineseVoiceURI  = d.chineseVoiceURI   || null;
+      State.englishPitch     = (d.englishPitch  != null) ? d.englishPitch  : 1.15;
+      State.chinesePitch     = (d.chinesePitch  != null) ? d.chinesePitch  : 1.20;
+      State.englishVolume    = (d.englishVolume != null) ? d.englishVolume : 1.0;
+      State.chineseVolume    = (d.chineseVolume != null) ? d.chineseVolume : 1.0;
     } catch (e) { /* first run */ }
   },
 
@@ -83,46 +105,86 @@ const Storage = {
   }
 };
 
-// ── Voice Picker ───────────────────────────────────────────
-// 自動挑選各平台「甜美女聲」。不同手機/系統可用的聲音不同，
-// 依偏好清單比對，找不到就退而求其次用該語系任一女聲。
+// ── Voice Picker (Voice Character System V2.1) ─────────────
+// 依語系優先序挑選女聲；找不到指定語音時退而選同語系女聲，
+// 再不行用系統女聲；絕不自動改用男聲。
+const STYLE_PITCH = {
+  normal:     { en: 1.00, zh: 1.05 },
+  sweet:      { en: 1.15, zh: 1.20 },
+  very_sweet: { en: 1.30, zh: 1.35 },
+};
+
+const FEMALE_HINTS = ['female','woman','girl','samantha','victoria','karen','tessa','moira','fiona',
+  'serena','kate','stephanie','allison','ava','susan','zoe','amelie','anna','ellen','emma','aria',
+  'zira','jenny','michelle','sonia','libby','natasha','clara','catherine','hazel','heera','nora',
+  'mei','meijia','mei-jia','hsiao','yating','hanhan','tracy','sinji','sin-ji','ya-ling','tingting',
+  'ting-ting','xiaoxiao','xiaoyi','huihui','yaoyao','婷','涵','曉','小','美','女'];
+const MALE_HINTS = ['male','man','daniel','alex','fred','thomas','rishi','aaron','arthur','oliver',
+  'george','james','ryan','guy','liang','kangkang','yunyang','danny','gordon','rocko','reed','eddy',
+  'grandpa','junior','男'];
+
+function isMaleVoice(name)   { const n = (name||'').toLowerCase(); return MALE_HINTS.some(m => n.includes(m)); }
+function isFemaleVoice(name) { const n = (name||'').toLowerCase(); return !isMaleVoice(name) && FEMALE_HINTS.some(f => n.includes(f)); }
+
 const Voices = {
   en: null,
   zh: null,
+  list: [],
   loaded: false,
-  // 英文女聲偏好（iOS / Android / Windows / Mac 常見的甜美女聲）
-  EN_PREF: ['Samantha', 'Ava', 'Allison', 'Susan', 'Google US English',
-            'Microsoft Aria', 'Microsoft Zira', 'Microsoft Jenny',
-            'Karen', 'Tessa', 'Victoria', 'Female'],
-  // 中文（台灣）女聲偏好
-  ZH_PREF: ['Mei-Jia', 'Meijia', 'Google 國語（臺灣）', 'Microsoft HsiaoChen',
-            'Microsoft Yating', 'Microsoft HanHan', 'Ya-Ling', 'Tingting',
-            'Sinji', 'Female', '女'],
+  EN_TIERS: ['en-gb', 'en-au', 'en-us', 'en'],   // 英文優先序
+  ZH_TIERS: ['zh-tw', 'zh-hk', 'zh-cn', 'zh'],    // 中文優先序
+
+  norm(l) { return (l || '').toLowerCase().replace('_', '-'); },
+
+  resolve(tiers, savedURI) {
+    const all = this.list;
+    if (!all.length) return null;
+    // 1) 使用者已選定且仍存在 → 直接用
+    if (savedURI) {
+      const saved = all.find(v => v.voiceURI === savedURI || v.name === savedURI);
+      if (saved) return saved;
+    }
+    // 2) 依語系優先序找女聲
+    for (const t of tiers) {
+      const fem = all.find(v => this.norm(v.lang).startsWith(t) && isFemaleVoice(v.name));
+      if (fem) return fem;
+    }
+    // 3) 依語系優先序找非男聲（避免誤用男聲）
+    for (const t of tiers) {
+      const any = all.find(v => this.norm(v.lang).startsWith(t) && !isMaleVoice(v.name));
+      if (any) return any;
+    }
+    // 4) 系統任一女聲（同大語系）
+    const broad = tiers[tiers.length - 1].slice(0, 2);
+    const sysFem = all.find(v => this.norm(v.lang).startsWith(broad) && isFemaleVoice(v.name));
+    if (sysFem) return sysFem;
+    const sysAny = all.find(v => this.norm(v.lang).startsWith(broad) && !isMaleVoice(v.name));
+    if (sysAny) return sysAny;
+    // 5) 找不到女聲就回傳 null（用瀏覽器預設），不強制改用男聲
+    return null;
+  },
 
   refresh() {
-    const all = speechSynthesis.getVoices();
-    if (!all.length) return;            // 有些瀏覽器首次回傳空陣列
-    const pick = (prefs, prefix) => {
-      const inLang = all.filter(v => (v.lang || '').toLowerCase().startsWith(prefix));
-      for (const name of prefs) {
-        const hit = inLang.find(v =>
-          (v.name || '').toLowerCase().includes(name.toLowerCase()));
-        if (hit) return hit;
-      }
-      return inLang[0] || null;          // 退而求其次：該語系任一聲音
-    };
-    this.en = pick(this.EN_PREF, 'en');
-    this.zh = pick(this.ZH_PREF, 'zh');
+    this.list = (typeof speechSynthesis !== 'undefined' ? speechSynthesis.getVoices() : []) || [];
+    if (!this.list.length) return;        // 有些瀏覽器首次回傳空陣列
+    this.en = this.resolve(this.EN_TIERS, State.englishVoiceURI);
+    this.zh = this.resolve(this.ZH_TIERS, State.chineseVoiceURI);
     this.loaded = true;
   },
 
   forLang(lang) {
     if (!this.loaded) this.refresh();
-    return (lang || '').startsWith('zh') ? this.zh : this.en;
+    return this.norm(lang).startsWith('zh') ? this.zh : this.en;
+  },
+
+  // 某語系可供選擇的（非男）語音清單，給 Settings 下拉用
+  optionsFor(kind) {
+    const tiers = kind === 'zh' ? this.ZH_TIERS : this.EN_TIERS;
+    const broad = tiers[tiers.length - 1].slice(0, 2);
+    return this.list.filter(v => this.norm(v.lang).startsWith(broad) && !isMaleVoice(v.name));
   }
 };
-if ('speechSynthesis' in window) {
-  // 語音清單常是非同步載入，監聽事件才抓得到
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   speechSynthesis.onvoiceschanged = () => Voices.refresh();
   Voices.refresh();
 }
@@ -138,13 +200,13 @@ const TTS = {
     return new Promise((resolve) => {
       if (this.stopped) { resolve(); return; }
       const u = new SpeechSynthesisUtterance(text);
-      u.lang  = lang;
+      const isZh = (lang || '').toLowerCase().startsWith('zh');
       const v = Voices.forLang(lang);
-      if (v) u.voice = v;
-      u.rate  = rate * State.speed;
-      // 音調拉高一點，營造甜美可愛的聲線（中文再甜一點）
-      u.pitch = lang.startsWith('zh') ? 1.35 : 1.25;
-      u.volume = 1.0;
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang; }
+      u.rate   = rate * State.speed;
+      // Voice Character V2.1：英文/中文各自套用 pitch 與 volume
+      u.pitch  = isZh ? State.chinesePitch  : State.englishPitch;
+      u.volume = isZh ? State.chineseVolume : State.englishVolume;
       u.onend     = resolve;
       u.onerror   = resolve;   // don't stall on error
       this.active = u;
@@ -229,6 +291,7 @@ const App = {
     document.getElementById('app').innerHTML = loadingHTML();
     Storage.load();
     Storage.loadExtras();
+    Voices.refresh();   // 套用已儲存的語音選擇
     applyTheme(State.theme);
 
     try {
@@ -884,6 +947,32 @@ const App = {
       `<button class="theme-chip ${State.pauseTime === p ? 'active' : ''}" onclick="App.setPauseTime(${p})">${p}s</button>`
     ).join('');
 
+    // ── Voice Character V2.1 ──
+    Voices.refresh();
+    const styles = [
+      { id: 'normal',     label: 'Normal' },
+      { id: 'sweet',      label: 'Sweet' },
+      { id: 'very_sweet', label: 'Very Sweet' },
+    ];
+    const styleChips = styles.map(s =>
+      `<button class="theme-chip ${State.voiceStyle === s.id ? 'active' : ''}" onclick="App.setVoiceStyle('${s.id}')">${s.label}</button>`
+    ).join('');
+
+    const buildVoiceOptions = (kind, current) => {
+      const list = Voices.optionsFor(kind);
+      if (!list.length) return `<option value="">系統預設 Female</option>`;
+      return list.map(v =>
+        `<option value="${v.voiceURI}" ${current && current.voiceURI === v.voiceURI ? 'selected' : ''}>${v.name} (${v.lang})</option>`
+      ).join('');
+    };
+    const enVoiceName = Voices.en ? `${Voices.en.name} (${Voices.en.lang})` : '系統預設 Female';
+    const zhVoiceName = Voices.zh ? `${Voices.zh.name} (${Voices.zh.lang})` : '系統預設 Female';
+    const enVoiceOptions = buildVoiceOptions('en', Voices.en);
+    const zhVoiceOptions = buildVoiceOptions('zh', Voices.zh);
+    const selStyle = 'flex:1;min-width:0;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px';
+    const rngStyle = 'flex:1;accent-color:var(--green)';
+    const valStyle = 'min-width:38px;text-align:right;color:var(--green);font-weight:700;font-size:13px';
+
     document.getElementById('app').innerHTML = `
       <div class="topbar">
         <button class="back-btn" onclick="App.renderHome()" style="display:flex;align-items:center;gap:6px;font-size:15px;color:var(--green);background:none">‹ 返回</button>
@@ -938,6 +1027,83 @@ const App = {
           </div>
         </div>
         <div class="settings-group">
+          <div class="settings-group-label">Voice Character 語音角色</div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">英文老師 Emma</span>
+              <select style="${selStyle}" onchange="App.setEnglishVoice(this.value)">${enVoiceOptions}</select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label" style="font-size:11px;color:var(--muted);font-weight:400">目前：${enVoiceName}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">中文老師 小涵</span>
+              <select style="${selStyle}" onchange="App.setChineseVoice(this.value)">${zhVoiceOptions}</select>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label" style="font-size:11px;color:var(--muted);font-weight:400">目前：${zhVoiceName}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">Voice Style</span>
+              <div class="theme-chips">${styleChips}</div>
+            </div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-group-label">Advanced Voice Settings 進階語音</div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">English Pitch</span>
+              <input type="range" min="0.8" max="1.5" step="0.05" value="${State.englishPitch}" style="${rngStyle}" oninput="App.setEnglishPitch(this.value)">
+              <span id="enPitchVal" style="${valStyle}">${Number(State.englishPitch).toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">Chinese Pitch</span>
+              <input type="range" min="0.8" max="1.5" step="0.05" value="${State.chinesePitch}" style="${rngStyle}" oninput="App.setChinesePitch(this.value)">
+              <span id="zhPitchVal" style="${valStyle}">${Number(State.chinesePitch).toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">English Volume</span>
+              <input type="range" min="0.5" max="1.0" step="0.05" value="${State.englishVolume}" style="${rngStyle}" oninput="App.setEnglishVolume(this.value)">
+              <span id="enVolVal" style="${valStyle}">${Number(State.englishVolume).toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">Chinese Volume</span>
+              <input type="range" min="0.5" max="1.0" step="0.05" value="${State.chineseVolume}" style="${rngStyle}" oninput="App.setChineseVolume(this.value)">
+              <span id="zhVolVal" style="${valStyle}">${Number(State.chineseVolume).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-group">
+          <div class="settings-group-label">Voice Test 語音試聽</div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">Test English Voice</span>
+              <button class="theme-chip" onclick="App.testVoice('en')">▶ 試聽</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-item">
+              <span class="settings-item-label">Test Chinese Voice</span>
+              <button class="theme-chip" onclick="App.testVoice('zh')">▶ 試聽</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-group">
           <div class="settings-group-label">進度</div>
           <div class="settings-row">
             <div class="settings-item">
@@ -985,6 +1151,61 @@ const App = {
     State.pauseTime = p;
     Storage.save();
     this.renderSettings();
+  },
+
+  // ── Voice Character V2.1 handlers ──
+  setVoiceStyle(style) {
+    State.voiceStyle = style;
+    const p = STYLE_PITCH[style] || STYLE_PITCH.sweet;
+    State.englishPitch = p.en;
+    State.chinesePitch = p.zh;
+    Storage.save();
+    this.renderSettings();
+  },
+  setEnglishVoice(uri) {
+    State.englishVoiceURI = uri || null;
+    Voices.refresh();
+    Storage.save();
+    this.renderSettings();
+  },
+  setChineseVoice(uri) {
+    State.chineseVoiceURI = uri || null;
+    Voices.refresh();
+    Storage.save();
+    this.renderSettings();
+  },
+  setEnglishPitch(v) {
+    State.englishPitch = parseFloat(v);
+    Storage.save();
+    const el = document.getElementById('enPitchVal');
+    if (el) el.textContent = Number(v).toFixed(2);
+  },
+  setChinesePitch(v) {
+    State.chinesePitch = parseFloat(v);
+    Storage.save();
+    const el = document.getElementById('zhPitchVal');
+    if (el) el.textContent = Number(v).toFixed(2);
+  },
+  setEnglishVolume(v) {
+    State.englishVolume = parseFloat(v);
+    Storage.save();
+    const el = document.getElementById('enVolVal');
+    if (el) el.textContent = Number(v).toFixed(2);
+  },
+  setChineseVolume(v) {
+    State.chineseVolume = parseFloat(v);
+    Storage.save();
+    const el = document.getElementById('zhVolVal');
+    if (el) el.textContent = Number(v).toFixed(2);
+  },
+  testVoice(kind) {
+    TTS.stop();
+    TTS.reset();
+    if (kind === 'zh') {
+      TTS.speak('歡迎使用 Louis Food English Coach。', 'zh-TW');
+    } else {
+      TTS.speak('Good morning, welcome to Louis Food English Coach.', 'en-US');
+    }
   },
 
   resetProgress() {

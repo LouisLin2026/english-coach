@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lfec-v6';
+const CACHE_NAME = 'lfec-v7';
 const STATIC_ASSETS = [
   './',
   './index.html',
